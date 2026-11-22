@@ -2,6 +2,10 @@ import AppKit
 import ApplicationServices
 import ISS
 
+// Private but stable since 10.x (used by yabai, AltTab): maps an AX window to its CGWindowID
+@_silgen_name("_AXUIElementGetWindow")
+private func _AXUIElementGetWindow(_ element: AXUIElement, _ id: UnsafeMutablePointer<CGWindowID>) -> AXError
+
 /// A hotkey that brings an app to the front, switching instantly to the desktop of its window.
 struct AppHotkey: Codable, Equatable, Identifiable {
   var id = UUID()
@@ -105,8 +109,27 @@ enum AppFocuser {
     NSWorkspace.shared.openApplication(at: url, configuration: NSWorkspace.OpenConfiguration())
   }
 
-  /// Space index of the app's frontmost real window on the cursor's display.
+  /// Space index of the window the app will bring forward when activated.
   private static func spaceIndex(of pid: pid_t) -> UInt32? {
+    // Ask the app first: the window list can put a stray hidden window (Rex has one on desktop 1)
+    // ahead of the real one, and then activation still animates to the right desktop
+    let app = AXUIElementCreateApplication(pid)
+    for attribute in [kAXFocusedWindowAttribute, kAXMainWindowAttribute] {
+      var value: CFTypeRef?
+      var windowID: CGWindowID = 0
+      var index: UInt32 = 0
+      if AXUIElementCopyAttributeValue(app, attribute as CFString, &value) == .success,
+         let value, CFGetTypeID(value) == AXUIElementGetTypeID(),
+         _AXUIElementGetWindow(value as! AXUIElement, &windowID) == .success,
+         iss_get_window_space_index(windowID, &index) {
+        return index
+      }
+    }
+    return frontWindowSpaceIndex(of: pid)
+  }
+
+  /// Fallback: the app's frontmost real window in the window list.
+  private static func frontWindowSpaceIndex(of pid: pid_t) -> UInt32? {
     let options: CGWindowListOption = [.optionAll, .excludeDesktopElements]
     guard let windows = CGWindowListCopyWindowInfo(options, kCGNullWindowID) as? [[String: Any]]
     else { return nil }
