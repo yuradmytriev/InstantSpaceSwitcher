@@ -7,6 +7,7 @@ import ISS
 final class AppDelegate: NSObject, NSApplicationDelegate {
   private let menuBarController = MenuBarController()
   private let hotkeyStore = HotkeyStore.shared
+  private let appHotkeyStore = AppHotkeyStore.shared
   private lazy var preferencesWindowController = PreferencesWindowController()
   private var currentSpaceIndex: UInt32?
   private var lastSpaceIndex: UInt32?
@@ -246,6 +247,10 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
       self?.registerHotkey(for: .lastSpace, combination: $0)
     }.store(in: &cancellables)
 
+    appHotkeyStore.$apps.receive(on: RunLoop.main).sink { [weak self] in
+      self?.registerAppHotkeys($0)
+    }.store(in: &cancellables)
+
     hotkeyStore.$enabledStates.receive(on: RunLoop.main).sink { [weak self] _ in
       guard let self = self else { return }
       for identifier in HotkeyIdentifier.allCases {
@@ -264,6 +269,17 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
       let combination = hotkeyStore.combination(for: identifier)
       menuBarController.applyHotkey(combination, to: identifier)
       registerHotkey(for: identifier, combination: combination)
+    }
+    registerAppHotkeys(appHotkeyStore.apps)
+  }
+
+  private func registerAppHotkeys(_ apps: [AppHotkey]) {
+    HotKeyManager.shared.unregisterAll(withPrefix: "app.")
+    for app in apps {
+      guard let combination = app.combination else { continue }
+      HotKeyManager.shared.register(key: app.hotkeyKey, combination: combination) {
+        AppFocuser.toggle(app)
+      }
     }
   }
 

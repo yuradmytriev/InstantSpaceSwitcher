@@ -5,12 +5,12 @@ class HotKeyManager {
   static let shared = HotKeyManager()
 
   private struct Entry {
-    let identifier: HotkeyIdentifier
     let combination: HotkeyCombination
     let handler: () -> Void
   }
 
-  private var entries: [HotkeyIdentifier: Entry] = [:]
+  // Keyed by HotkeyIdentifier.rawValue for built-in actions, "app.<uuid>" for app hotkeys
+  private var entries: [String: Entry] = [:]
   private var eventTap: CFMachPort?
   private var runLoopSource: CFRunLoopSource?
   private var retryScheduled = false
@@ -22,14 +22,24 @@ class HotKeyManager {
   func register(
     identifier: HotkeyIdentifier, combination: HotkeyCombination, handler: @escaping () -> Void
   ) {
-    unregister(identifier: identifier)
+    register(key: identifier.rawValue, combination: combination, handler: handler)
+  }
 
-    entries[identifier] = Entry(identifier: identifier, combination: combination, handler: handler)
+  func register(key: String, combination: HotkeyCombination, handler: @escaping () -> Void) {
+    entries[key] = Entry(combination: combination, handler: handler)
     installEventTap()
   }
 
   func unregister(identifier: HotkeyIdentifier) {
-    entries.removeValue(forKey: identifier)
+    unregister(key: identifier.rawValue)
+  }
+
+  func unregister(key: String) {
+    entries.removeValue(forKey: key)
+  }
+
+  func unregisterAll(withPrefix prefix: String) {
+    entries = entries.filter { !$0.key.hasPrefix(prefix) }
   }
 
   func unregisterAll() {

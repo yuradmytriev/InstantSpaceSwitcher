@@ -14,7 +14,12 @@ final class PreferencesTabViewController: NSTabViewController {
     shortcutsTab.label = "Keyboard"
     shortcutsTab.image = NSImage(systemSymbolName: "keyboard", accessibilityDescription: "Keyboard")
 
+    let appsTab = NSTabViewItem(viewController: AppShortcutsViewController())
+    appsTab.label = "Apps"
+    appsTab.image = NSImage(systemSymbolName: "square.grid.2x2", accessibilityDescription: "Apps")
+
     addTabViewItem(generalTab)
     addTabViewItem(shortcutsTab)
+    addTabViewItem(appsTab)
   }
 }
